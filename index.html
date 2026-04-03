@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>皇帝的贴身史官</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dopamine: {
+                            orange: '#FF8C42', pink: '#FF6B8B', yellow: '#F9C74F', mint: '#43AA8B',
+                            sky: '#4D9DE0', purple: '#9B5DE5', coral: '#F48C6E', lime: '#A7C957',
+                        },
+                    },
+                    fontFamily: { 'sans': ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'], },
+                    boxShadow: { 'colorful': '0 10px 20px -5px rgba(0,0,0,0.08), 0 0 0 1px rgba(255,140,66,0.1)', },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: linear-gradient(145deg, #FFF7E8 0%, #FFFAF0 100%); min-height: 100vh; }
+        .hover-rainbow:hover { transform: translateY(-2px); filter: brightness(1.02); transition: all 0.2s ease; }
+        button:not(:disabled):active { transform: scale(0.97); }
+        .mood-emoji { transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1); cursor: pointer; }
+        .mood-emoji:hover { transform: scale(1.2); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+        .mood-active { transform: scale(1.15); filter: drop-shadow(0 0 6px #F9C74F); }
+        ::-webkit-scrollbar { width: 6px; height: 6px;}
+        ::-webkit-scrollbar-track { background: #FFE8D6; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #FF8C42; border-radius: 10px; }
+        .timer-pulse { animation: pulseGlow 1.2s infinite; }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 0 0 rgba(255, 140, 66, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(255, 140, 66, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 140, 66, 0); } }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; visibility: hidden; opacity: 0; transition: visibility 0.2s, opacity 0.2s; }
+        .modal-overlay.active { visibility: visible; opacity: 1; }
+        .modal-content { background: white; border-radius: 2rem; max-width: 90vw; width: 420px; max-height: 70vh; overflow-y: auto; box-shadow: 0 25px 40px rgba(0,0,0,0.2); border-top: 6px solid #FF8C42; }
+        
+        .draggable-module { position: relative; transition: all 0.3s ease; background: white; min-height: 200px; min-width: 280px; }
+        .module-controls { opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .edit-mode .module-controls { opacity: 1; pointer-events: auto; }
+        .edit-mode .draggable-module { outline: 2px dashed rgba(255, 140, 66, 0.3); outline-offset: 4px; }
+        .drag-handle:active { cursor: grabbing !important; }
+        .drop-target { outline: 3px dashed #FF8C42 !important; outline-offset: -4px; opacity: 0.6; }
+
+        /* 新增：百官叩拜的专属动画 */
+        @keyframes bowing {
+            0%, 100% { transform: translateY(0) scaleY(1); }
+            50% { transform: translateY(20px) scaleY(0.75); }
+        }
+        .animate-bowing { animation: bowing 1.2s ease-in-out infinite; }
+        .court-active { display: flex !important; opacity: 1 !important; }
+    </style>
+</head>
+<body class="font-sans p-4 md:p-6 lg:p-8">
+    
+    <div id="imperialCourtOverlay" class="fixed inset-0 z-[9999] pointer-events-none flex flex-col items-center justify-center opacity-0 transition-opacity duration-500 hidden" style="background: radial-gradient(circle, rgba(100,30,0,0.9) 0%, rgba(0,0,0,0.95) 100%);">
+        <div class="relative z-10 text-center flex flex-col items-center">
+            <h1 class="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-yellow-400 to-yellow-600 mb-12 tracking-[0.2em] drop-shadow-[0_0_20px_rgba(253,224,71,0.6)]" style="font-family: '楷体', 'STKaiti', serif; text-shadow: 0 4px 10px rgba(0,0,0,0.8);">吾皇万岁万万岁</h1>
+            <div class="text-6xl md:text-8xl flex justify-center gap-6 animate-bowing">
+                🙇‍♂️ 🙇🏻‍♂️ 🙇🏼‍♂️ 🙇🏽‍♂️ 🙇🏾‍♂️
+            </div>
+            <div class="text-5xl md:text-7xl flex justify-center gap-8 mt-6 opacity-80 animate-bowing" style="animation-delay: 0.3s;">
+                🙇🏻‍♂️ 🙇🏼‍♂️ 🙇🏽‍♂️ 🙇🏾‍♂️ 🙇🏿‍♂️
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-6 md:mb-8">
+            <div class="flex items-center gap-4">
+                <div class="relative group cursor-pointer" onclick="document.getElementById('avatarInput').click()" title="点击更换头像">
+                    <img id="userAvatar" src="https://api.dicebear.com/7.x/notionists/svg?seed=PhD&backgroundColor=ffb8b8" alt="User Avatar" class="w-16 h-16 rounded-full border-4 border-white shadow-md object-cover transition-transform group-hover:scale-105 bg-white">
+                    <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-camera text-white text-sm"></i></div>
+                    <input type="file" id="avatarInput" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
+                </div>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-dopamine-orange to-dopamine-pink bg-clip-text text-transparent flex items-center gap-2">
+                        <i class="fas fa-crown text-dopamine-orange"></i>皇帝的进步日记
+                        <span id="streakBadge" class="hidden bg-gradient-to-r from-orange-400 to-pink-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm ml-2 items-center gap-1"><i class="fas fa-fire"></i> 连续上朝 <span id="streakCount">0</span> 天</span>
+                    </h1>
+                    <p class="text-amber-600/80 text-sm mt-1 flex items-center gap-2"><i class="far fa-calendar-alt text-dopamine-sky"></i><span id="currentDate"></span><span class="w-1 h-1 bg-amber-300 rounded-full"></span><span>今日是否上朝科研，不开心就早日退朝！</span></p>
+                </div>
+            </div>
+            
+            <div class="flex flex-col gap-2 items-end">
+                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-md px-3 py-2 flex items-center gap-2 border border-dopamine-yellow/40">
+                    <span class="text-sm font-bold text-dopamine-orange flex items-center gap-1"><i class="far fa-smile-wink"></i> 龙体圣意</span>
+                    <div class="flex gap-2 text-2xl">
+                        <span data-mood="happy" class="mood-emoji cursor-pointer" role="button" aria-label="开心">😊</span>
+                        <span data-mood="neutral" class="mood-emoji cursor-pointer" role="button" aria-label="一般">😐</span>
+                        <span data-mood="sad" class="mood-emoji cursor-pointer" role="button" aria-label="不开心">😔</span>
+                    </div>
+                    <button id="viewMoodHistoryBtn" class="bg-gradient-to-r from-dopamine-yellow to-dopamine-orange text-white text-xs px-2.5 py-1 rounded-full shadow-sm hover:shadow transition flex items-center gap-1"><i class="fas fa-history"></i> 史册</button>
+                    <div id="moodHint" class="text-xs text-dopamine-mint ml-0"></div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button id="layoutLockBtn" onclick="toggleLayoutLock()" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full border border-gray-300 transition flex items-center gap-1 shadow-sm font-medium">
+                        <i class="fas fa-lock"></i> 阵法锁定
+                    </button>
+                    <button onclick="exportData()" class="bg-white hover:bg-amber-50 text-dopamine-orange text-xs px-3 py-1.5 rounded-full border border-dopamine-yellow/50 transition flex items-center gap-1 shadow-sm font-medium"><i class="fas fa-download"></i> 史库备份</button>
+                    <button onclick="document.getElementById('importInput').click()" class="bg-white hover:bg-green-50 text-dopamine-mint text-xs px-3 py-1.5 rounded-full border border-dopamine-mint/50 transition flex items-center gap-1 shadow-sm font-medium"><i class="fas fa-upload"></i> 重建江山</button>
+                    <input type="file" id="importInput" accept=".json" class="hidden" onchange="importData(event)">
+                </div>
+            </div>
+        </div>
+
+        <div id="moodHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-orange"><i class="far fa-smile"></i> 圣意起居注</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="moodHistoryList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        <div id="taskHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-pink"><i class="fas fa-check-circle"></i> 已批奏折 · 归档</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="taskHistoryList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        <div id="ideaHistoryModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-mint"><i class="fas fa-lightbulb"></i> 天恩闪念 · 历史</h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div id="ideaHistoryList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">加载中...</div></div></div>
+        
+        <div id="dayDetailModal" class="modal-overlay"><div class="modal-content p-5"><div class="flex justify-between items-center border-b border-dopamine-sky/30 pb-2 mb-3"><h3 class="text-lg font-bold text-dopamine-sky flex items-center gap-2"><i class="far fa-calendar-check"></i> <span id="dayDetailTitle">日期详情</span></h3><button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button></div><div class="space-y-4"><div class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-3 flex justify-between items-center shadow-sm"><span class="text-sm font-bold text-dopamine-orange"><i class="fas fa-hourglass-half"></i> 专注时长</span><span id="detailFocusTime" class="font-black text-2xl text-dopamine-orange">0 min</span></div><div><h4 class="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1"><i class="fas fa-check-circle text-dopamine-mint"></i> 这一天完成的任务</h4><div id="detailCompletedTasks" class="space-y-2 max-h-32 overflow-y-auto text-sm pr-1"></div></div><div><h4 class="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1"><i class="fas fa-tasks text-dopamine-sky"></i> 当时的待办与压力</h4><div id="detailPendingTasks" class="space-y-2 max-h-32 overflow-y-auto text-sm pr-1"></div></div></div></div></div>
+
+        <div id="checkInModal" class="modal-overlay">
+            <div class="modal-content p-5">
+                <div class="flex justify-between items-center border-b border-dopamine-yellow/30 pb-2 mb-3">
+                    <h3 class="text-lg font-bold text-gray-800" id="checkModalTitle">📝 时段补录与复盘</h3>
+                    <button class="close-modal-btn text-gray-400 hover:text-dopamine-pink text-xl">&times;</button>
+                </div>
+                <input type="hidden" id="checkModalPeriod">
+                <div class="space-y-4">
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="text-xs font-bold text-gray-500">上朝时间 (可修改)</label>
+                            <input type="time" id="checkModalStart" class="w-full mt-1 p-2 border rounded-lg bg-gray-50 outline-none focus:border-dopamine-orange text-sm">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs font-bold text-gray-500">退朝时间 (可修改)</label>
+                            <input type="time" id="checkModalEnd" class="w-full mt-1 p-2 border rounded-lg bg-gray-50 outline-none focus:border-dopamine-orange text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">本朝精力评估 (任选其一)</label>
+                        <div class="flex gap-2 mt-1">
+                            <button type="button" class="energy-btn flex-1 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 bg-gray-50 transition" data-energy="🔥 龙威浩荡">🔥 龙威</button>
+                            <button type="button" class="energy-btn flex-1 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 bg-gray-50 transition" data-energy="😫 圣体违和">😫 违和</button>
+                            <button type="button" class="energy-btn flex-1 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 bg-gray-50 transition" data-energy="👥 朝堂纷争">👥 杂政</button>
+                        </div>
+                        <input type="hidden" id="checkModalEnergy">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">圣裁碎碎念 / 奏折产出</label>
+                        <textarea id="checkModalNote" rows="2" class="w-full mt-1 p-2 border rounded-lg bg-gray-50 outline-none focus:border-dopamine-orange resize-none text-sm" placeholder="比如：跑通了模型，或者导师（太上皇）临时加了活儿..."></textarea>
+                    </div>
+                    <button onclick="saveCheckModal()" class="w-full bg-dopamine-orange text-white py-2.5 rounded-xl font-bold shadow-sm hover:bg-orange-500 transition">💾 载入史册</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboard-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <div id="module-focus" class="draggable-module col-span-1 lg:col-span-2 rounded-2xl shadow-colorful p-5 md:p-6" style="border-top: 4px solid #FF6B8B;">
+                <div class="module-controls absolute top-3 right-3 flex gap-2 z-10">
+                    <button class="w-8 h-8 rounded-full bg-gray-100 hover:bg-dopamine-sky/20 text-gray-500 hover:text-dopamine-sky flex items-center justify-center transition" onclick="toggleModuleSize(this)" title="切换 满宽/半宽并列"><i class="fas fa-expand-arrows-alt"></i></button>
+                    <div class="drag-handle w-8 h-8 rounded-full bg-gray-100 hover:bg-orange-100 text-gray-500 hover:text-dopamine-orange flex items-center justify-center transition cursor-grab" title="拖拽排序"><i class="fas fa-grip-horizontal"></i></div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-4 mt-2">
+                    <div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-dopamine-yellow/20 flex items-center justify-center"><i class="fas fa-hourglass-half text-dopamine-orange text-2xl"></i></div><div><h2 class="text-xl font-bold text-gray-800">今日理政时间</h2><p class="text-gray-500 text-xs">番茄工作法 · 累积能量</p></div></div>
+                    <div class="bg-dopamine-yellow/10 px-6 py-3 rounded-2xl text-center mt-4 sm:mt-0"><span id="todayFocusMinutes" class="text-4xl md:text-5xl font-black text-dopamine-orange">0</span><span class="text-xl font-semibold text-dopamine-orange/80 ml-1">分钟</span></div>
+                </div>
+                <div class="mt-5 flex flex-wrap gap-4 items-center justify-between border-t border-dopamine-yellow/20 pt-4">
+                    <div class="flex gap-2 items-center w-full md:w-auto">
+                        <select id="focusMode" class="px-3 py-2.5 rounded-xl border border-dopamine-yellow/50 bg-amber-50/30 focus:border-dopamine-orange outline-none text-sm text-gray-600 font-medium transition-colors">
+                            <option value="free">♾️ 自由理政</option>
+                            <option value="25">🍅 25分钟番茄钟</option>
+                            <option value="50">🧠 50分钟深度钟</option>
+                        </select>
+                        <button id="startFocusBtn" class="bg-dopamine-orange hover:bg-dopamine-orange/85 text-white px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition font-medium"><i class="fas fa-play-circle"></i> 开始审阅</button>
+                        <button id="stopFocusBtn" class="bg-dopamine-mint hover:bg-dopamine-mint/80 text-white px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition font-medium"><i class="fas fa-stop-circle"></i> 歇息片刻</button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div id="countdownDisplay" class="hidden text-2xl font-black text-dopamine-orange bg-orange-50 px-3 py-1 rounded-lg border border-orange-100">25:00</div>
+                        <div id="focusStatusBadge" class="text-sm bg-dopamine-lime/10 text-dopamine-mint px-3 py-1.5 rounded-full flex items-center gap-2"><i class="fas fa-info-circle"></i> <span id="focusActiveState">⏸️ 暂无专注</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="module-routine" class="draggable-module col-span-1 lg:col-span-2 rounded-2xl shadow-colorful p-5 md:p-6" style="border-left: 8px solid #43AA8B;">
+                <div class="module-controls absolute top-3 right-3 flex gap-2 z-10"><button class="w-8 h-8 rounded-full bg-gray-100 hover:bg-dopamine-sky/20 text-gray-500 hover:text-dopamine-sky flex items-center justify-center transition" onclick="toggleModuleSize(this)" title="切换 满宽/半宽并列"><i class="fas fa-expand-arrows-alt"></i></button><div class="drag-handle w-8 h-8 rounded-full bg-gray-100 hover:bg-orange-100 text-gray-500 hover:text-dopamine-orange flex items-center justify-center transition cursor-grab" title="拖拽排序"><i class="fas fa-grip-horizontal"></i></div></div>
+                <div class="flex items-center justify-between mb-4 pb-2 border-b border-dopamine-yellow/30 mt-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-check-circle text-dopamine-purple text-xl"></i>
+                        <h2 class="text-xl font-bold text-gray-800">作息起居 · 真实四段式</h2>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-3 shadow-sm border border-orange-100/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-orange text-sm flex items-center gap-1"><i class="fas fa-sun"></i> 早朝</h3>
+                            <span class="text-[10px] text-dopamine-orange/70">08:00-12:00</span>
+                        </div>
+                        <div class="flex gap-1.5 mb-2">
+                            <button onclick="checkTime('morning','start')" class="flex-1 bg-dopamine-orange text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">上朝</button>
+                            <button onclick="checkTime('morning','end')" class="flex-1 bg-dopamine-sky text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">退朝</button>
+                            <button onclick="openCheckModal('morning')" class="bg-white text-gray-400 px-2 py-1 rounded text-xs shadow-sm border border-gray-100 hover:text-dopamine-orange transition" title="补录/复盘"><i class="fas fa-edit"></i></button>
+                        </div>
+                        <div id="morning" class="text-[11px] bg-white rounded p-1.5 text-gray-600 font-mono border border-amber-50 min-h-[44px]">始: -  终: -</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl p-3 shadow-sm border border-sky-100/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-sky text-sm flex items-center gap-1"><i class="fas fa-cloud-sun"></i> 午朝</h3>
+                            <span class="text-[10px] text-dopamine-sky/70">12:00-18:00</span>
+                        </div>
+                        <div class="flex gap-1.5 mb-2">
+                            <button onclick="checkTime('afternoon','start')" class="flex-1 bg-dopamine-sky text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">上朝</button>
+                            <button onclick="checkTime('afternoon','end')" class="flex-1 bg-dopamine-purple text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">退朝</button>
+                            <button onclick="openCheckModal('afternoon')" class="bg-white text-gray-400 px-2 py-1 rounded text-xs shadow-sm border border-gray-100 hover:text-dopamine-sky transition" title="补录/复盘"><i class="fas fa-edit"></i></button>
+                        </div>
+                        <div id="afternoon" class="text-[11px] bg-white rounded p-1.5 text-gray-600 font-mono border border-blue-50 min-h-[44px]">始: -  终: -</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 shadow-sm border border-purple-100/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-purple text-sm flex items-center gap-1"><i class="fas fa-moon"></i> 晚朝</h3>
+                            <span class="text-[10px] text-dopamine-purple/70">18:00-23:00</span>
+                        </div>
+                        <div class="flex gap-1.5 mb-2">
+                            <button onclick="checkTime('evening','start')" class="flex-1 bg-dopamine-purple text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">上朝</button>
+                            <button onclick="checkTime('evening','end')" class="flex-1 bg-dopamine-pink text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">退朝</button>
+                            <button onclick="openCheckModal('evening')" class="bg-white text-gray-400 px-2 py-1 rounded text-xs shadow-sm border border-gray-100 hover:text-dopamine-purple transition" title="补录/复盘"><i class="fas fa-edit"></i></button>
+                        </div>
+                        <div id="evening" class="text-[11px] bg-white rounded p-1.5 text-gray-600 font-mono border border-purple-50 min-h-[44px]">始: -  终: -</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-indigo-50 to-slate-50 rounded-xl p-3 shadow-sm border border-indigo-100/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-dopamine-pink  text-sm flex items-center gap-1">🧘‍♂️ 修仙</h3>
+                            <span class="text-[10px] text-dopamine-pink /70">23:00-次日</span>
+                        </div>
+                        <div class="flex gap-1.5 mb-2">
+                            <button onclick="checkTime('night','start')" class="flex-1 bg-indigo-400 text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">上朝</button>
+                            <button onclick="checkTime('night','end')" class="flex-1 bg-slate-500 text-white py-1 rounded text-xs font-bold shadow-sm hover:opacity-80 transition">退朝</button>
+                            <button onclick="openCheckModal('night')" class="bg-white text-gray-400 px-2 py-1 rounded text-xs shadow-sm border border-gray-100 hover:text-indigo-500 transition" title="补录/复盘"><i class="fas fa-edit"></i></button>
+                        </div>
+                        <div id="night" class="text-[11px] bg-white rounded p-1.5 text-gray-600 font-mono border border-indigo-50 min-h-[44px]">始: -  终: -</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="module-tasks" class="draggable-module col-span-1 lg:col-span-1 rounded-2xl shadow-colorful p-5 md:p-6 flex flex-col" style="border-right: 4px solid #F9C74F;">
+                <div class="module-controls absolute top-3 right-3 flex gap-2 z-10"><button class="w-8 h-8 rounded-full bg-gray-100 hover:bg-dopamine-sky/20 text-gray-500 hover:text-dopamine-sky flex items-center justify-center transition" onclick="toggleModuleSize(this)" title="切换 满宽/半宽并列"><i class="fas fa-expand-arrows-alt"></i></button><div class="drag-handle w-8 h-8 rounded-full bg-gray-100 hover:bg-orange-100 text-gray-500 hover:text-dopamine-orange flex items-center justify-center transition cursor-grab" title="拖拽排序"><i class="fas fa-grip-horizontal"></i></div></div>
+                <div class="flex items-center justify-between border-b border-dopamine-yellow/30 pb-3 mb-4 mt-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-tasks text-dopamine-pink text-xl"></i>
+                        <h2 class="text-xl font-bold text-gray-800">奏折管理</h2>
+                        <span class="text-xs bg-dopamine-yellow/30 text-dopamine-orange px-2 py-0.5 rounded-full hidden xl:inline-block">未完顺延</span>
+                    </div>
+                    <button id="viewTaskHistoryBtn" class="text-dopamine-pink hover:bg-dopamine-pink hover:text-white border border-pink-100 transition text-xs font-semibold bg-pink-50 px-3 py-1.5 rounded-full flex items-center gap-1 ml-auto shadow-sm relative z-0">
+                        <i class="fas fa-history"></i> 查看历史
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-3 mb-5">
+                    <div class="relative flex-1 flex gap-2 flex-wrap md:flex-nowrap">
+                        <div class="relative flex-1 min-w-[120px]"><i class="fas fa-pen absolute left-3 top-1/2 -translate-y-1/2 text-dopamine-orange/50 text-sm"></i><input id="taskInput" type="text" placeholder="写论文..." class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-dopamine-yellow/50 bg-amber-50/30 focus:border-dopamine-orange focus:ring-1 transition outline-none"></div>
+                        <select id="taskCategory" class="px-2 py-2.5 rounded-xl border border-dopamine-sky/50 bg-sky-50/30 outline-none text-xs text-gray-600 font-medium"><option value="📚">📚文献</option><option value="🔬">🔬实验</option><option value="✍️">✍️写作</option><option value="💻">💻绘图</option><option value="📝">📝日常</option></select>
+                        <select id="taskPriority" class="px-2 py-2.5 rounded-xl border border-dopamine-yellow/50 bg-amber-50/30 outline-none text-xs text-gray-600 font-medium cursor-pointer"><option value="high">🔴紧急</option><option value="medium" selected>🟡重要</option><option value="low">🟢日常</option></select>
+                    </div>
+                    <button onclick="addTask()" class="bg-dopamine-pink text-white px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 transition font-medium"><i class="fas fa-plus"></i></button>
+                </div>
+                <div class="flex-1 overflow-y-auto pr-1 min-h-[200px]">
+                    <ul id="taskList" class="space-y-3"></ul>
+                    <div id="emptyTaskHint" class="text-center text-gray-400 text-sm py-6 hidden flex-col items-center gap-1"><i class="fas fa-clipboard-list text-3xl opacity-40"></i><span>✨ 暂无奏折</span></div>
+                </div>
+            </div>
+
+            <div id="module-ideas" class="draggable-module col-span-1 lg:col-span-1 rounded-2xl shadow-colorful p-5 md:p-6 flex flex-col" style="border-bottom: 4px solid #43AA8B;">
+                <div class="module-controls absolute top-3 right-3 flex gap-2 z-10"><button class="w-8 h-8 rounded-full bg-gray-100 hover:bg-dopamine-sky/20 text-gray-500 hover:text-dopamine-sky flex items-center justify-center transition" onclick="toggleModuleSize(this)" title="切换 满宽/半宽并列"><i class="fas fa-expand-arrows-alt"></i></button><div class="drag-handle w-8 h-8 rounded-full bg-gray-100 hover:bg-orange-100 text-gray-500 hover:text-dopamine-orange flex items-center justify-center transition cursor-grab" title="拖拽排序"><i class="fas fa-grip-horizontal"></i></div></div>
+                <div class="flex items-center justify-between border-b border-dopamine-mint/30 pb-3 mb-4 mt-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-dopamine-yellow text-xl drop-shadow-md"></i>
+                        <h2 class="text-xl font-bold text-gray-800">天恩闪念</h2>
+                        <span class="text-xs bg-dopamine-lime/20 text-dopamine-mint px-2 py-0.5 rounded-full hidden xl:inline-block">捕捉火花</span>
+                    </div>
+                    <button id="viewIdeaHistoryBtn" class="text-dopamine-mint hover:bg-dopamine-mint hover:text-white border border-green-100 transition text-xs font-semibold bg-green-50 px-3 py-1.5 rounded-full flex items-center gap-1 ml-auto shadow-sm relative z-0">
+                        <i class="fas fa-history"></i> 闪念归档
+                    </button>
+                </div>
+                
+                <div class="flex gap-2 mb-5 items-stretch">
+                    <div class="relative flex-1">
+                        <textarea id="ideaInput" rows="2" placeholder="记录瞬间的想法..." class="w-full h-full p-3 rounded-xl border border-dopamine-mint/40 bg-green-50/20 focus:border-dopamine-mint focus:ring-1 transition outline-none resize-none"></textarea>
+                    </div>
+                    <button onclick="addIdea()" class="bg-dopamine-mint hover:bg-dopamine-mint/80 text-white px-4 sm:px-6 rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition flex-shrink-0">
+                        <i class="fas fa-bolt text-lg"></i> 
+                        <span class="text-sm font-bold"></span>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto pr-1 min-h-[150px]">
+                    <ul id="ideaList" class="space-y-3"></ul>
+                    <div id="emptyIdeaHint" class="text-center text-gray-400 text-sm py-6 hidden flex-col items-center gap-1"><i class="far fa-comment-dots text-3xl opacity-40"></i><span>随时记录奇思妙想～</span></div>
+                </div>
+            </div>
+
+            <div id="module-calendar" class="draggable-module col-span-1 lg:col-span-2 rounded-2xl shadow-colorful p-5 md:p-6" style="border-top: 4px solid #4D9DE0;">
+                <div class="module-controls absolute top-3 right-3 flex gap-2 z-10"><button class="w-8 h-8 rounded-full bg-gray-100 hover:bg-dopamine-sky/20 text-gray-500 hover:text-dopamine-sky flex items-center justify-center transition" onclick="toggleModuleSize(this)" title="切换 满宽/半宽并列"><i class="fas fa-expand-arrows-alt"></i></button><div class="drag-handle w-8 h-8 rounded-full bg-gray-100 hover:bg-orange-100 text-gray-500 hover:text-dopamine-orange flex items-center justify-center transition cursor-grab" title="拖拽排序"><i class="fas fa-grip-horizontal"></i></div></div>
+                <div class="flex items-center justify-between border-b border-dopamine-sky/30 pb-3 mb-4 mt-2">
+                    <div class="flex items-center gap-2"><i class="fas fa-map-marked-alt text-dopamine-sky text-xl"></i><h2 class="text-xl font-bold text-gray-800">江山社稷图</h2><span class="text-xs bg-dopamine-sky/20 text-dopamine-sky px-2 py-0.5 rounded-full">热力日历</span></div>
+                    <div class="flex items-center gap-3 ml-auto relative z-0"><button id="prevMonthBtn" class="text-gray-400 hover:text-dopamine-sky transition p-1"><i class="fas fa-chevron-left"></i></button><span id="calendarMonthYear" class="font-bold text-gray-700 text-sm w-20 text-center">202X年X月</span><button id="nextMonthBtn" class="text-gray-400 hover:text-dopamine-sky transition p-1"><i class="fas fa-chevron-right"></i></button></div>
+                </div>
+                <div class="grid grid-cols-7 gap-1 md:gap-2 text-center text-xs font-bold text-gray-400 mb-2"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+                <div id="calendarGrid" class="grid grid-cols-7 gap-1 md:gap-2"></div>
+            </div>
+
+            <div id="module-stats" class="draggable-module col-span-1 lg:col-span-2 rounded-2xl shadow-colorful p-5 md:p-6 flex flex-col" style="background: linear-gradient(135deg, #FFF9F0, #FFF5E6);">
+                <div class="module-controls absolute top-3 right-3 flex gap-2 z-10"><button class="w-8 h-8 rounded-full bg-gray-100 hover:bg-dopamine-sky/20 text-gray-500 hover:text-dopamine-sky flex items-center justify-center transition" onclick="toggleModuleSize(this)" title="切换 满宽/半宽并列"><i class="fas fa-expand-arrows-alt"></i></button><div class="drag-handle w-8 h-8 rounded-full bg-gray-100 hover:bg-orange-100 text-gray-500 hover:text-dopamine-orange flex items-center justify-center transition cursor-grab" title="拖拽排序"><i class="fas fa-grip-horizontal"></i></div></div>
+                <div class="flex items-center gap-2 border-b border-dopamine-yellow/40 pb-3 mb-5 mt-2">
+                    <i class="fas fa-chart-pie text-dopamine-purple text-xl"></i><h2 class="text-xl font-bold text-gray-800">司天监 · 统计看板</h2><span class="text-xs bg-dopamine-lime/30 text-dopamine-mint px-2 py-0.5 rounded-full">汇总</span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gradient-to-br from-dopamine-orange/10 to-dopamine-yellow/10 rounded-xl p-4 shadow-sm"><div class="flex items-center gap-2 text-dopamine-orange mb-3"><i class="fas fa-calendar-week"></i><h3 class="font-bold text-lg">本周</h3></div><div class="space-y-2 text-sm"><div class="flex justify-between"><span>✅ 批阅奏折:</span><span id="weekTasks" class="font-bold text-dopamine-orange">0</span></div><div class="flex justify-between"><span>⏱️ 理政时长:</span><span id="weekFocus" class="font-bold text-dopamine-orange">0 min</span></div><div class="flex justify-between"><span>📅 上朝天数:</span><span id="weekCheckDays" class="font-bold text-dopamine-orange">0 天</span></div></div></div>
+                    <div class="bg-gradient-to-br from-dopamine-mint/10 to-dopamine-sky/10 rounded-xl p-4 shadow-sm"><div class="flex items-center gap-2 text-dopamine-mint mb-3"><i class="fas fa-calendar-alt"></i><h3 class="font-bold text-lg">本月</h3></div><div class="space-y-2 text-sm"><div class="flex justify-between"><span>✅ 批阅奏折:</span><span id="monthTasks" class="font-bold text-dopamine-mint">0</span></div><div class="flex justify-between"><span>⏱️ 理政时长:</span><span id="monthFocus" class="font-bold text-dopamine-mint">0 min</span></div><div class="flex justify-between"><span>📅 上朝天数:</span><span id="monthCheckDays" class="font-bold text-dopamine-mint">0 天</span></div></div></div>
+                    <div class="bg-gradient-to-br from-dopamine-pink/10 to-dopamine-purple/10 rounded-xl p-4 shadow-sm"><div class="flex items-center gap-2 text-dopamine-purple mb-3"><i class="fas fa-chart-line"></i><h3 class="font-bold text-lg">本年</h3></div><div class="space-y-2 text-sm"><div class="flex justify-between"><span>✅ 批阅奏折:</span><span id="yearTasks" class="font-bold text-dopamine-purple">0</span></div><div class="flex justify-between"><span>⏱️ 理政时长:</span><span id="yearFocus" class="font-bold text-dopamine-purple">0 min</span></div><div class="flex justify-between"><span>📅 上朝天数:</span><span id="yearCheckDays" class="font-bold text-dopamine-purple">0 天</span></div></div></div>
+                </div>
+
+                <div class="mt-6 border-t border-dopamine-yellow/20 pt-5 w-full">
+                    <h3 class="text-sm font-bold text-gray-600 mb-3 flex items-center gap-2"><i class="fas fa-chart-area text-dopamine-sky"></i> 近7天理政趋势</h3>
+                    <div class="relative h-56 w-full">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="text-center text-gray-400 text-xs mt-8 pt-4 border-t border-dopamine-yellow/30 flex justify-center gap-3">
+            <span><i class="far fa-save"></i> 史库自动存档</span><span>·</span><span><i class="fas fa-arrows-alt"></i> 支持拖动排序与满宽半宽并列</span><span>·</span><span><i class="far fa-smile"></i> 圣意起居相伴</span>
+        </div>
+    </div>
+
+    <script>
+        // ================= 数据初始化与存储 =================
+        let appData = { tasks: [], focusSessions: [], checkRecords: {}, ideas: [], moodHistory: {} };
+        let activeFocusStart = null; 
+        let focusTimerInterval = null; 
+        let remainingSeconds = 0; 
+        let currentFocusMode = 'free'; 
+        let currentCalendarDate = new Date(); 
+        let focusTrendChart = null; 
+        let isLayoutLocked = true;
+
+        function getTodayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+        function formatDateToYMD(timestamp) { const d = new Date(timestamp); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+        function saveData() { localStorage.setItem("phd_pro_v2", JSON.stringify(appData)); }
+        
+        function loadData() {
+            const stored = localStorage.getItem("phd_pro_v2");
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    appData.tasks = parsed.tasks || []; appData.focusSessions = parsed.focusSessions || [];
+                    appData.checkRecords = parsed.checkRecords || {}; appData.ideas = parsed.ideas || parsed.foods || []; appData.moodHistory = parsed.moodHistory || {};
+                } catch(e) { initDefault(); }
+            } else initDefault();
+            if (appData.tasks.some(t => !t.id)) appData.tasks.forEach((t, idx) => { if(!t.id) t.id = Date.now() + idx; });
+            appData.tasks.forEach(t => { if(!t.category) t.category = ""; });
+            saveData();
+        }
+        
+        function initDefault() { appData.tasks = [ { id: Date.now()+1, name: "阅读核心文献", category: "📚 文献", priority: "high", status: "未开始", createdAt: Date.now(), completedAt: null } ]; appData.ideas = []; appData.moodHistory = {}; }
+
+        // ================= 专注计时核心逻辑 =================
+        function updateFocusButtons() {
+            const startBtn = document.getElementById("startFocusBtn");
+            const stopBtn = document.getElementById("stopFocusBtn");
+            const modeSelect = document.getElementById("focusMode");
+            
+            if (activeFocusStart !== null) {
+                startBtn.classList.add("opacity-50", "cursor-not-allowed"); startBtn.disabled = true;
+                stopBtn.classList.remove("opacity-50", "cursor-not-allowed"); stopBtn.disabled = false;
+                modeSelect.disabled = true; modeSelect.classList.add("opacity-50");
+            } else {
+                startBtn.classList.remove("opacity-50", "cursor-not-allowed"); startBtn.disabled = false;
+                stopBtn.classList.add("opacity-50", "cursor-not-allowed"); stopBtn.disabled = true;
+                modeSelect.disabled = false; modeSelect.classList.remove("opacity-50");
+            }
+        }
+
+        function resetFocusUI() { 
+            activeFocusStart = null; 
+            if (focusTimerInterval) { clearInterval(focusTimerInterval); focusTimerInterval = null; } 
+            document.getElementById("focusActiveState").innerHTML = '⏸️ 暂无专注';
+            document.getElementById("focusStatusBadge").classList.remove("timer-pulse");
+            document.getElementById("countdownDisplay").classList.add("hidden");
+            updateFocusButtons(); 
+            renderAll(); 
+        }
+        
+        function startFocus() {
+            if (activeFocusStart !== null) { alert("⚠️ 陛下，您已经在理政中了，请先结束当前专注！"); return; }
+            
+            // 触发全屏上朝百官朝拜动画
+            const courtOverlay = document.getElementById('imperialCourtOverlay');
+            courtOverlay.classList.remove('hidden');
+            setTimeout(() => courtOverlay.classList.add('court-active'), 10);
+            
+            // 3秒后自动隐藏动画
+            setTimeout(() => {
+                courtOverlay.classList.remove('court-active');
+                setTimeout(() => courtOverlay.classList.add('hidden'), 500); 
+            }, 3000);
+
+            // 计时逻辑继续
+            currentFocusMode = document.getElementById("focusMode").value; 
+            activeFocusStart = Date.now(); 
+            document.getElementById("focusStatusBadge").classList.add("timer-pulse");
+            updateFocusButtons(); 
+            
+            if (currentFocusMode === 'free') { 
+                document.getElementById("focusActiveState").innerHTML = '<i class="fas fa-spinner fa-pulse"></i> 🔥 自由理政中...'; 
+                document.getElementById("countdownDisplay").classList.add("hidden"); 
+            } else {
+                remainingSeconds = parseInt(currentFocusMode) * 60; 
+                document.getElementById("countdownDisplay").classList.remove("hidden"); 
+                updateCountdownDisplay(); 
+                document.getElementById("focusActiveState").innerHTML = `<i class="fas fa-spinner fa-pulse"></i> 🍅 ${parseInt(currentFocusMode)}分钟理政中...`;
+                focusTimerInterval = setInterval(() => { 
+                    remainingSeconds--; 
+                    updateCountdownDisplay(); 
+                    if (remainingSeconds <= 0) { clearInterval(focusTimerInterval); alert(`🎉 陛下圣明！完成了 ${parseInt(currentFocusMode)} 分钟理政！请移步御花园歇息片刻～`); saveFocusSession(parseInt(currentFocusMode)); resetFocusUI(); } 
+                }, 1000);
+            }
+        }
+        
+        function stopFocus() { 
+            if (activeFocusStart === null) { alert("👀 陛下当前未在理政哦，请先点击「开始」！"); return; }
+            const actualMinutes = Math.floor((Date.now() - activeFocusStart) / 60000); 
+            if (currentFocusMode !== 'free' && remainingSeconds > 0) { if (!confirm("⚠️ 番茄钟尚未结束，陛下确定要提前退朝吗？（满1分钟才会记录史册）")) { return; } }
+            if (actualMinutes > 0) { saveFocusSession(actualMinutes); alert(`✅ 退朝！已成功将陛下 ${actualMinutes} 分钟的辛劳载入史册。`); } else { alert("⚠️ 本次理政不足 1 分钟，未能生成有效记录。陛下再接再厉！"); }
+            resetFocusUI(); 
+        }
+
+        function saveFocusSession(minutes) { appData.focusSessions.push({ startTimestamp: activeFocusStart, endTimestamp: Date.now(), durationMinutes: minutes, dateStr: formatDateToYMD(activeFocusStart) }); saveData(); }
+        function getTodayFocusMinutes() { return appData.focusSessions.filter(s => s.dateStr === getTodayStr()).reduce((sum, s) => sum + s.durationMinutes, 0); }
+        function updateCountdownDisplay() { document.getElementById("countdownDisplay").innerText = `${Math.floor(remainingSeconds / 60).toString().padStart(2, '0')}:${(remainingSeconds % 60).toString().padStart(2, '0')}`; }
+
+        // ================= 拖拽排序与网格切换逻辑 =================
+        let dragSrcEl = null;
+
+        function toggleLayoutLock() {
+            isLayoutLocked = !isLayoutLocked;
+            const btn = document.getElementById('layoutLockBtn');
+            const container = document.getElementById('dashboard-container');
+            if (isLayoutLocked) {
+                btn.innerHTML = '<i class="fas fa-lock"></i> 阵法已锁定';
+                btn.className = "bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full border border-gray-300 transition flex items-center gap-1 shadow-sm font-medium";
+                container.classList.remove('edit-mode');
+            } else {
+                btn.innerHTML = '<i class="fas fa-unlock text-dopamine-orange"></i> 阵法调整中...';
+                btn.className = "bg-orange-50 hover:bg-orange-100 text-dopamine-orange text-xs px-3 py-1.5 rounded-full border border-dopamine-orange/50 transition flex items-center gap-1 shadow-sm font-medium animate-pulse";
+                container.classList.add('edit-mode');
+            }
+            saveLayout();
+        }
+
+        function toggleModuleSize(btnElement) {
+            if (isLayoutLocked) return;
+            const moduleEl = btnElement.closest('.draggable-module');
+            if (moduleEl.classList.contains('lg:col-span-2')) { moduleEl.classList.remove('lg:col-span-2'); moduleEl.classList.add('lg:col-span-1'); } 
+            else { moduleEl.classList.remove('lg:col-span-1'); moduleEl.classList.add('lg:col-span-2'); }
+            saveLayout();
+        }
+
+        function initDragAndDrop() {
+            const container = document.getElementById('dashboard-container');
+            const modules = document.querySelectorAll('.draggable-module');
+            const handles = document.querySelectorAll('.drag-handle');
+
+            handles.forEach(handle => {
+                handle.addEventListener('mousedown', (e) => { if(isLayoutLocked) return; const card = e.target.closest('.draggable-module'); if(card) card.setAttribute('draggable', 'true'); });
+                handle.addEventListener('mouseup', (e) => { const card = e.target.closest('.draggable-module'); if(card) card.setAttribute('draggable', 'false'); });
+                handle.addEventListener('mouseleave', (e) => { const card = e.target.closest('.draggable-module'); if(card) card.setAttribute('draggable', 'false'); });
+            });
+
+            modules.forEach(module => {
+                module.addEventListener('dragstart', function(e) { if(isLayoutLocked) { e.preventDefault(); return; } dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/html', this.innerHTML); setTimeout(() => this.style.opacity = '0.4', 0); });
+                module.addEventListener('dragover', function(e) { if(isLayoutLocked) return true; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; });
+                module.addEventListener('dragenter', function(e) { if(isLayoutLocked) return; e.preventDefault(); this.classList.add('drop-target'); });
+                module.addEventListener('dragleave', function(e) { if(isLayoutLocked) return; this.classList.remove('drop-target'); });
+                module.addEventListener('drop', function(e) { if(isLayoutLocked) return; e.preventDefault(); e.stopPropagation(); this.classList.remove('drop-target'); if (dragSrcEl !== this) { const allItems = Array.from(container.children); if (allItems.indexOf(dragSrcEl) < allItems.indexOf(this)) this.after(dragSrcEl); else this.before(dragSrcEl); saveLayout(); } return false; });
+                module.addEventListener('dragend', function(e) { this.style.opacity = '1'; modules.forEach(m => { m.classList.remove('drop-target'); m.setAttribute('draggable', 'false'); }); });
+            });
+            loadLayout();
+        }
+
+        function saveLayout() { 
+            const layoutData = { locked: isLayoutLocked, modules: Array.from(document.getElementById('dashboard-container').children).map(el => ({ id: el.id, isFullWidth: el.classList.contains('lg:col-span-2') })) };
+            localStorage.setItem('phd_pro_layout_v3', JSON.stringify(layoutData)); 
+        }
+
+        function loadLayout() {
+            const storedOrder = localStorage.getItem('phd_pro_layout_v3');
+            if (storedOrder) {
+                try {
+                    const parsed = JSON.parse(storedOrder); isLayoutLocked = parsed.locked !== undefined ? parsed.locked : true;
+                    const container = document.getElementById('dashboard-container');
+                    if (parsed.modules && Array.isArray(parsed.modules)) { parsed.modules.forEach(m => { const el = document.getElementById(m.id); if (el) { container.appendChild(el); if(m.isFullWidth) { el.classList.remove('lg:col-span-1'); el.classList.add('lg:col-span-2'); } else { el.classList.remove('lg:col-span-2'); el.classList.add('lg:col-span-1'); } } }); }
+                } catch(e) {}
+            }
+            const btn = document.getElementById('layoutLockBtn'); const container = document.getElementById('dashboard-container');
+            if (isLayoutLocked) { btn.innerHTML = '<i class="fas fa-lock"></i> 阵法已锁定'; btn.className = "bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full border border-gray-300 transition flex items-center gap-1 shadow-sm font-medium"; container.classList.remove('edit-mode'); } 
+            else { btn.innerHTML = '<i class="fas fa-unlock text-dopamine-orange"></i> 阵法调整中...'; btn.className = "bg-orange-50 hover:bg-orange-100 text-dopamine-orange text-xs px-3 py-1.5 rounded-full border border-dopamine-orange/50 transition flex items-center gap-1 shadow-sm font-medium animate-pulse"; container.classList.add('edit-mode'); }
+        }
+
+        // ================= 作息打卡、精力状态与修仙模式逻辑 =================
+
+        function getCheckRecordsForToday() {
+            const today = getTodayStr();
+            if (!appData.checkRecords[today]) {
+                appData.checkRecords[today] = { morning: {}, afternoon: {}, evening: {}, night: {} };
+            }
+            if (!appData.checkRecords[today].night) {
+                appData.checkRecords[today].night = {};
+            }
+            return appData.checkRecords[today];
+        }
+
+        function calculateStreak() { 
+            const records = Object.keys(appData.checkRecords).sort().reverse(); 
+            if (records.length === 0) return 0; 
+            let streak = 0; 
+            let checkDate = new Date(); checkDate.setHours(0, 0, 0, 0); 
+            const todayStr = getTodayStr(); 
+            let hasToday = records.includes(todayStr) && ['morning', 'afternoon', 'evening', 'night'].some(p => appData.checkRecords[todayStr][p] && (appData.checkRecords[todayStr][p].start || appData.checkRecords[todayStr][p].end)); 
+            if (!hasToday) checkDate.setDate(checkDate.getDate() - 1); 
+            
+            for (let i = 0; i < 365; i++) { 
+                const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth()+1).padStart(2,'0')}-${String(checkDate.getDate()).padStart(2,'0')}`; 
+                if (appData.checkRecords[dateStr] && ['morning', 'afternoon', 'evening', 'night'].some(p => appData.checkRecords[dateStr][p] && (appData.checkRecords[dateStr][p].start || appData.checkRecords[dateStr][p].end))) { 
+                    streak++; checkDate.setDate(checkDate.getDate() - 1); 
+                } else break; 
+            } 
+            return streak; 
+        }
+
+        function updateStreakBadge() { 
+            const streak = calculateStreak(); 
+            const badge = document.getElementById("streakBadge"); 
+            if (streak > 0) { badge.style.display = "inline-flex"; document.getElementById("streakCount").innerText = streak; } 
+            else badge.style.display = "none"; 
+        }
+
+        function checkTime(period, type) { 
+            const recs = getCheckRecordsForToday();
+            recs[period][type] = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' }); 
+            saveData(); 
+            renderCheckDisplay(); 
+            updateStreakBadge(); 
+            const btn = event.currentTarget; const orig = btn.innerHTML; 
+            btn.innerHTML = '<i class="fas fa-stamp"></i> 钦此'; 
+            setTimeout(() => btn.innerHTML = orig, 800); 
+        }
+
+        function renderCheckDisplay() { 
+            const rec = getCheckRecordsForToday(); 
+            ["morning","afternoon","evening","night"].forEach(p => { 
+                const d = rec[p] || {}; 
+                const el = document.getElementById(p); 
+                if (el) { 
+                    let html = `<div class="flex justify-between text-gray-500"><span>始:${d.start ? d.start.slice(0,5) : "-"}</span><span>终:${d.end ? d.end.slice(0,5) : "-"}</span></div>`;
+                    if (d.energy || d.note) {
+                        html += `<div class="mt-1 pt-1 border-t border-gray-100 text-gray-600 line-clamp-2 leading-tight">`;
+                        if (d.energy) {
+                            let color = d.energy.includes("龙威") ? "text-orange-500" : (d.energy.includes("违和") ? "text-blue-500" : "text-green-500");
+                            html += `<span class="font-bold ${color} mr-1" title="${d.energy}">${d.energy.split(" ")[0]}</span>`;
+                        }
+                        if (d.note) html += `<span class="text-[10px]">${escapeHtml(d.note)}</span>`;
+                        html += `</div>`;
+                    }
+                    el.innerHTML = html;
+                } 
+            }); 
+        }
+
+        function openCheckModal(period) {
+            const recs = getCheckRecordsForToday();
+            const data = recs[period] || {};
+            
+            document.getElementById('checkModalPeriod').value = period;
+            const titleMap = { morning: "🌅 早朝", afternoon: "☕ 午朝", evening: "🌙 晚朝", night: "⚗️ 炼丹(修仙)" };
+            document.getElementById('checkModalTitle').innerHTML = `${titleMap[period]} 补录与复盘`;
+            
+            const formatTimeForInput = (tStr) => {
+                if (!tStr || tStr === '-') return '';
+                const m = tStr.match(/(\d+):(\d+)/);
+                return m ? `${m[1].padStart(2,'0')}:${m[2].padStart(2,'0')}` : '';
+            };
+            
+            document.getElementById('checkModalStart').value = formatTimeForInput(data.start);
+            document.getElementById('checkModalEnd').value = formatTimeForInput(data.end);
+            document.getElementById('checkModalNote').value = data.note || '';
+            document.getElementById('checkModalEnergy').value = data.energy || '';
+            
+            document.querySelectorAll('.energy-btn').forEach(b => {
+                b.classList.remove('ring-2', 'ring-dopamine-orange', 'bg-orange-50', 'text-dopamine-orange');
+                b.classList.add('bg-gray-50', 'text-gray-600');
+                if (b.getAttribute('data-energy') === data.energy) {
+                    b.classList.remove('bg-gray-50', 'text-gray-600');
+                    b.classList.add('ring-2', 'ring-dopamine-orange', 'bg-orange-50', 'text-dopamine-orange');
+                }
+            });
+            
+            document.getElementById('checkInModal').classList.add('active');
+        }
+
+        function saveCheckModal() {
+            const period = document.getElementById('checkModalPeriod').value;
+            const recs = getCheckRecordsForToday();
+            
+            const startVal = document.getElementById('checkModalStart').value;
+            const endVal = document.getElementById('checkModalEnd').value;
+            
+            if (startVal) recs[period].start = startVal + ":00"; else recs[period].start = null;
+            if (endVal) recs[period].end = endVal + ":00"; else recs[period].end = null;
+            
+            recs[period].energy = document.getElementById('checkModalEnergy').value;
+            recs[period].note = document.getElementById('checkModalNote').value;
+            
+            saveData();
+            renderCheckDisplay();
+            updateStreakBadge();
+            document.getElementById('checkInModal').classList.remove('active');
+        }
+
+
+        // ================= 其他业务逻辑 =================
+        function handleAvatarUpload(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { localStorage.setItem("phd_pro_avatar", e.target.result); document.getElementById("userAvatar").src = e.target.result; }; reader.readAsDataURL(file); }
+        function loadAvatar() { const stored = localStorage.getItem("phd_pro_avatar"); if (stored) document.getElementById("userAvatar").src = stored; }
+        function exportData() { const blob = new Blob([JSON.stringify(appData, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `史库备份_${getTodayStr()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); alert("🎉 陛下，数据史册已安全备份！"); }
+        function importData(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const data = JSON.parse(e.target.result); if (data && typeof data === 'object') { appData = {...appData, ...data}; saveData(); renderAll(); alert("✨ 陛下，前朝史料已成功恢复！"); } } catch (err) { alert("史料读取失败，可能已损坏。"); } }; reader.readAsText(file); event.target.value = ''; }
+        
+        function addTask() { const name = document.getElementById("taskInput").value.trim(); if (!name) return; appData.tasks.push({ id: Date.now(), name, priority: document.getElementById("taskPriority").value, category: document.getElementById("taskCategory").value, status: "未开始", createdAt: Date.now(), completedAt: null }); saveData(); document.getElementById("taskInput").value = ""; renderTasks(); updateStatistics(); }
+        function changeTaskStatus(id) { const t = appData.tasks.find(x => x.id === id); if (!t) return; if (t.status === "未开始") t.status = "进行中"; else if (t.status === "进行中") { t.status = "已完成"; t.completedAt = Date.now(); } else { t.status = "未开始"; t.completedAt = null; } saveData(); renderTasks(); updateStatistics(); }
+        function deleteTask(id) { if (confirm("陛下确定要将此奏折付之一炬？")) { appData.tasks = appData.tasks.filter(t => t.id !== id); saveData(); renderTasks(); updateStatistics(); } }
+        
+        function renderTasks() {
+            const container = document.getElementById("taskList"); const empty = document.getElementById("emptyTaskHint");
+            if (appData.tasks.length === 0) { container.innerHTML = ""; empty.classList.remove("hidden"); return; }
+            empty.classList.add("hidden"); container.innerHTML = "";
+            const weights = { high: 3, medium: 2, low: 1 };
+            [...appData.tasks].sort((a, b) => (a.status === "已完成" ? 1 : 0) - (b.status === "已完成" ? 1 : 0) || weights[b.priority] - weights[a.priority]).forEach(t => {
+                const li = document.createElement("li"); li.className = "bg-gradient-to-r from-amber-50/40 to-white p-3 rounded-xl flex items-center justify-between shadow-sm border border-dopamine-yellow/20";
+                const badge = t.priority === "high" ? '🔴' : (t.priority === "medium" ? '🟡' : '🟢');
+                li.innerHTML = `<div class="flex-1 text-sm"><span class="mr-2">${t.status === "已完成" ? '✅' : (t.status==="进行中"?'⏳':'🔘')}</span><span class="bg-blue-50 text-blue-500 text-[10px] px-1 rounded mr-1">${t.category}</span><span class="text-[10px] mr-1">${badge}</span><span class="${t.status==='已完成'?'line-through text-gray-400':''}">${escapeHtml(t.name)}</span></div>
+                <div class="flex gap-2"><button onclick="changeTaskStatus(${t.id})" class="px-2 py-1 text-xs text-white rounded shadow-sm ${t.status==='未开始'?'bg-orange-400':(t.status==='进行中'?'bg-blue-400':'bg-green-400')}">${t.status}</button><button onclick="deleteTask(${t.id})" class="text-red-400 px-2 py-1"><i class="fas fa-trash"></i></button></div>`;
+                container.appendChild(li);
+            });
+        }
+        
+        function addIdea() { const txt = document.getElementById("ideaInput").value.trim(); if(!txt) return; appData.ideas.push({ text: txt, time: new Date().toLocaleString() }); saveData(); document.getElementById("ideaInput").value = ""; renderIdeas(); }
+        function deleteIdea(i) { if(confirm("陛下确定要抹去这段闪念？")) { appData.ideas.splice(i,1); saveData(); renderIdeas(); } }
+        function renderIdeas() {
+            const container = document.getElementById("ideaList"); const empty = document.getElementById("emptyIdeaHint");
+            if (!appData.ideas.length) { container.innerHTML = ""; empty.classList.remove("hidden"); return; }
+            empty.classList.add("hidden"); container.innerHTML = "";
+            [...appData.ideas].reverse().forEach((item, rIdx) => {
+                const idx = appData.ideas.length - 1 - rIdx; const li = document.createElement("li");
+                li.className = "flex justify-between items-start bg-green-50/40 p-3 rounded-xl border-l-4 border-dopamine-mint shadow-sm";
+                li.innerHTML = `<div class="w-full pr-2 text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(item.text)}<div class="text-[10px] text-gray-400 mt-1">${item.time}</div></div><button class="text-gray-400 hover:text-red-400" onclick="deleteIdea(${idx})"><i class="fas fa-times"></i></button>`; container.appendChild(li);
+            });
+        }
+        
+        function updateStatistics() {
+            const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1); const mEnd = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59);
+            const wStart = new Date(now); wStart.setDate(now.getDate() - (now.getDay()||7) + 1); wStart.setHours(0,0,0,0);
+            const getT = (s,e) => appData.tasks.filter(t => t.status === "已完成" && t.completedAt >= s.getTime() && t.completedAt <= e.getTime()).length;
+            const getF = (s,e) => appData.focusSessions.filter(fs => fs.startTimestamp >= s.getTime() && fs.startTimestamp <= e.getTime()).reduce((sum, fs) => sum + fs.durationMinutes, 0);
+            document.getElementById("weekTasks").innerText = getT(wStart, now); document.getElementById("weekFocus").innerText = getF(wStart, now) + " min";
+            document.getElementById("monthTasks").innerText = getT(mStart, mEnd); document.getElementById("monthFocus").innerText = getF(mStart, mEnd) + " min";
+        }
+        
+        function renderTrendChart() {
+            const ctx = document.getElementById('trendChart'); if (!ctx) return;
+            const labels = []; const data = []; const today = new Date(); today.setHours(0,0,0,0);
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today); d.setDate(today.getDate() - i); const dStr = formatDateToYMD(d.getTime());
+                labels.push(`${d.getMonth() + 1}/${d.getDate()}`); data.push(appData.focusSessions.filter(s => s.dateStr === dStr).reduce((sum, s) => sum + s.durationMinutes, 0));
+            }
+            if (focusTrendChart) { focusTrendChart.data.labels = labels; focusTrendChart.data.datasets[0].data = data; focusTrendChart.update(); } 
+            else focusTrendChart = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: '理政分钟', data, borderColor: '#FF8C42', backgroundColor: 'rgba(255,140,66,0.2)', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } } });
+        }
+
+        function renderCalendar() {
+            const y = currentCalendarDate.getFullYear(); const m = currentCalendarDate.getMonth(); document.getElementById("calendarMonthYear").innerText = `${y}年${m + 1}月`;
+            const grid = document.getElementById("calendarGrid"); grid.innerHTML = "";
+            for (let i = 0; i < new Date(y, m, 1).getDay(); i++) grid.appendChild(document.createElement("div"));
+            for (let day = 1; day <= new Date(y, m + 1, 0).getDate(); day++) {
+                const dStr = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const mins = appData.focusSessions.filter(s => s.dateStr === dStr).reduce((sum, s) => sum + s.durationMinutes, 0);
+                const isToday = dStr === getTodayStr(); const tks = appData.tasks.filter(t => t.status === "已完成" && formatDateToYMD(t.completedAt) === dStr);
+                let bg = "bg-gray-50 text-gray-500"; if (mins > 180) bg = "bg-dopamine-orange text-white font-bold transform hover:scale-110"; else if (mins > 60) bg = "bg-orange-300 text-white font-bold"; else if (mins > 0) bg = "bg-orange-100 text-orange-700 font-bold";
+                const cell = document.createElement("div"); cell.className = `aspect-square rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all border border-gray-100 ${bg} ${isToday?'ring-2 ring-dopamine-sky':''}`;
+                cell.innerHTML = `<span>${day}</span>${tks.length>0?'<span class="w-1 h-1 bg-green-500 rounded-full mt-1"></span>':''}`; cell.onclick = () => showDayDetail(dStr, mins, tks); grid.appendChild(cell);
+            }
+        }
+
+        function showDayDetail(dStr, mins, tks) {
+            document.getElementById("dayDetailTitle").innerText = dStr; document.getElementById("detailFocusTime").innerText = `${mins} min`;
+            document.getElementById("detailCompletedTasks").innerHTML = tks.length ? tks.map(t => `<div class="bg-gray-50 p-2 rounded mb-1">✅ ${escapeHtml(t.name)}</div>`).join("") : '<div class="text-xs text-gray-400">无</div>';
+            document.getElementById("dayDetailModal").classList.add("active");
+        }
+
+        function renderAll() { 
+            document.getElementById("todayFocusMinutes").innerText = getTodayFocusMinutes(); 
+            renderCheckDisplay(); renderTasks(); renderIdeas(); updateStatistics(); updateMoodUI(); updateStreakBadge(); renderCalendar(); renderTrendChart();
+            updateFocusButtons(); 
+        }
+
+        function setMood(m) { appData.moodHistory[getTodayStr()] = m; saveData(); updateMoodUI(); }
+        function updateMoodUI() { const m = appData.moodHistory[getTodayStr()]; document.querySelectorAll('.mood-emoji').forEach(el => { el.classList.remove('mood-active'); if (el.getAttribute('data-mood') === m) el.classList.add('mood-active'); }); }
+        
+        function showMoodHistory() {
+            const container = document.getElementById("moodHistoryList");
+            const entries = Object.entries(appData.moodHistory).sort((a,b) => b[0].localeCompare(a[0]));
+            container.innerHTML = entries.length === 0 ? '<div class="text-center text-gray-400 py-4"><i class="far fa-frown"></i> 暂无起居记录</div>' : entries.map(([date, mood]) => `<div class="flex justify-between items-center bg-gradient-to-r from-amber-50 to-white p-3 rounded-xl shadow-sm border-l-4 border-dopamine-yellow"><span class="text-sm font-medium text-gray-700">${date}</span><span class="text-xl">${mood === 'happy' ? '😊 龙颜大悦' : (mood === 'neutral' ? '😐 圣意平平' : '😔 圣心不悦')}</span></div>`).join('');
+            document.getElementById("moodHistoryModal").classList.add("active");
+        }
+        
+        function showTaskHistory() {
+            const container = document.getElementById("taskHistoryList");
+            const completed = appData.tasks.filter(t => t.status === "已完成" && t.completedAt).sort((a,b) => b.completedAt - a.completedAt);
+            container.innerHTML = completed.length === 0 ? '<div class="text-center text-gray-400 py-4"><i class="fas fa-check-circle"></i> 暂无已批奏折</div>' : completed.map(task => `<div class="flex justify-between items-center bg-gradient-to-r from-pink-50 to-white p-3 rounded-xl shadow-sm border-l-4 border-dopamine-pink"><div><span class="text-sm font-medium">✅ ${escapeHtml(task.name)}</span><div class="text-xs text-gray-400">完成于 ${formatDateToYMD(task.completedAt)}</div></div></div>`).join('');
+            document.getElementById("taskHistoryModal").classList.add("active");
+        }
+        
+        function showIdeaHistory() {
+            const container = document.getElementById("ideaHistoryList");
+            const ideasCopy = [...appData.ideas].reverse();
+            container.innerHTML = ideasCopy.length === 0 ? '<div class="text-center text-gray-400 py-4"><i class="fas fa-lightbulb"></i> 暂无闪念记录</div>' : ideasCopy.map(item => `<div class="flex justify-between items-center bg-gradient-to-r from-green-50 to-white p-3 rounded-xl shadow-sm border-l-4 border-dopamine-mint"><div><span class="text-sm font-medium text-gray-800 whitespace-pre-wrap">${escapeHtml(item.text)}</span><div class="text-xs text-gray-400 mt-1">${item.time}</div></div></div>`).join('');
+            document.getElementById("ideaHistoryModal").classList.add("active");
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+        function escapeHtml(s) { return s ? s.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])) : ''; }
+        
+        function bindEvents() {
+            document.getElementById("startFocusBtn").onclick = startFocus; 
+            document.getElementById("stopFocusBtn").onclick = stopFocus;
+            document.getElementById("taskInput").addEventListener("keypress", (e) => { if(e.key === "Enter") addTask(); }); 
+            document.getElementById("ideaInput").addEventListener("keydown", (e) => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addIdea(); } });
+            document.querySelectorAll('.mood-emoji').forEach(el => el.addEventListener('click', e => setMood(e.currentTarget.getAttribute('data-mood'))));
+            
+            document.querySelectorAll('.energy-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.energy-btn').forEach(b => {
+                        b.classList.remove('ring-2', 'ring-dopamine-orange', 'bg-orange-50', 'text-dopamine-orange');
+                        b.classList.add('bg-gray-50', 'text-gray-600');
+                    });
+                    e.currentTarget.classList.remove('bg-gray-50', 'text-gray-600');
+                    e.currentTarget.classList.add('ring-2', 'ring-dopamine-orange', 'bg-orange-50', 'text-dopamine-orange');
+                    document.getElementById('checkModalEnergy').value = e.currentTarget.getAttribute('data-energy');
+                });
+            });
+
+            document.getElementById("viewMoodHistoryBtn").onclick = showMoodHistory;
+            document.getElementById("viewTaskHistoryBtn").onclick = showTaskHistory;
+            document.getElementById("viewIdeaHistoryBtn").onclick = showIdeaHistory;
+            
+            document.querySelectorAll('.close-modal-btn').forEach(btn => btn.onclick = closeModals);
+            document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModals(); }));
+            document.getElementById("prevMonthBtn").onclick = () => { currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1); renderCalendar(); };
+            document.getElementById("nextMonthBtn").onclick = () => { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1); renderCalendar(); };
+        }
+        
+        function init() {
+            loadData(); loadAvatar(); bindEvents();
+            document.getElementById("currentDate").innerText = new Date().toLocaleDateString();
+            renderAll(); initDragAndDrop(); setInterval(() => { document.getElementById("currentDate").innerText = new Date().toLocaleDateString(); renderAll(); }, 60000);
+        }
+        
+        init();
+        
+        window.checkTime = checkTime; window.addTask = addTask; window.addIdea = addIdea; window.deleteIdea = deleteIdea; window.changeTaskStatus = changeTaskStatus; window.deleteTask = deleteTask; window.toggleModuleSize = toggleModuleSize; window.toggleLayoutLock = toggleLayoutLock;
+        window.openCheckModal = openCheckModal; window.saveCheckModal = saveCheckModal;
+    </script>
+</body>
+</html>
